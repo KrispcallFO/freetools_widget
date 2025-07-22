@@ -1,0 +1,57 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Countries_Number {
+  id Int  @id @default(autoincrement())
+  countries String
+  country_code String
+  number String @unique
+  expiry_date DateTime
+  extension_date DateTime
+}
+
+model Number_Details {
+  id Int  @id @default(autoincrement())
+  to_number String
+  from_number String
+  time_stamp  DateTime @default(now())
+  messages   String
+}
+
+model OtpMessages {
+  id              Int      @id @default(autoincrement())
+  phoneNumber     String
+  text            String
+  code            String?
+  parsedTimestamp DateTime @default(now())
+  createdAt       DateTime @default(now())
+
+  @@index([phoneNumber])
+  @@index([parsedTimestamp])
+}
+
+model User {
+  id         Int     @id @default(autoincrement())
+  name       String
+  email      String  @unique
+  password   String
+  phone      String
+  address    String
+  role       String
+  isVerified Boolean @default(false)
+  createdAt  DateTime @default(now())
+
+    @@map("user") 
+}

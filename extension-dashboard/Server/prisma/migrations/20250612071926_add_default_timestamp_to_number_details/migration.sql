@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE "Number_Details" ALTER COLUMN "time_stamp" SET DEFAULT CURRENT_TIMESTAMP;

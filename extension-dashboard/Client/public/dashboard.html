@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>KrispCall Number Dashboard</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    .scroll-table { max-height: 400px; overflow-y: auto; }
+    ::-webkit-scrollbar { height: 8px; width: 8px; }
+    ::-webkit-scrollbar-thumb { background-color: rgba(100, 100, 100, 0.3); border-radius: 8px; }
+  </style>
+</head>
+<body class="bg-gray-50 text-gray-800 p-6">
+  <div class="max-w-7xl mx-auto space-y-10">
+    <h1 class="text-3xl font-bold text-center text-purple-700">KrispCall Number Dashboard</h1>
+
+    <!-- Number Table -->
+    <div class="bg-white p-6 shadow-md rounded-lg">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-xl font-semibold text-gray-700">Phone Numbers</h2>
+        <p class="text-sm text-gray-600">Total Numbers: <span id="total-count">0</span></p>
+      </div>
+
+      <div class="scroll-table overflow-x-auto border rounded-lg">
+        <table class="min-w-full text-sm text-left text-gray-700">
+          <thead class="text-xs uppercase bg-purple-100 sticky top-0">
+            <tr>
+              <th class="px-4 py-3">Country</th>
+              <th class="px-4 py-3">Country Code</th>
+              <th class="px-4 py-3">Number</th>
+              <th class="px-4 py-3">Expiry Date</th>
+              <th class="px-4 py-3">Extension Date</th>
+              <th class="px-4 py-3">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="number-table-body" class="divide-y"></tbody>
+          <tfoot>
+            <tr class="bg-gray-50">
+              <td class="px-4 py-2"><input type="text" id="add-country" placeholder="Country" class="border p-1 w-full rounded-md" /></td>
+              <td class="px-4 py-2"><input type="text" id="add-country-code" placeholder="Country Code" class="border p-1 w-full rounded-md" /></td>
+              <td class="px-4 py-2"><input type="text" id="add-number" placeholder="Number" class="border p-1 w-full rounded-md" /></td>
+              <td class="px-4 py-2"><input type="date" id="add-expiry" class="border p-1 w-full rounded-md" /></td>
+              <td class="px-4 py-2"><input type="date" id="add-extension" class="border p-1 w-full rounded-md" /></td>
+              <td class="px-4 py-2">
+                <button onclick="addNumber()" class="bg-purple-600 text-white px-3 py-1 rounded hover:bg-purple-700">Add</button>
+              </td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>
+
+    <!-- Inbox Table -->
+    <div class="bg-white p-6 shadow-md rounded-lg">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-xl font-semibold text-gray-700">Message Inbox</h2>
+        <input type="text" id="search-inbox" placeholder="Search by phone number..." class="border p-2 rounded-md w-60 text-sm" oninput="filterInbox()" />
+      </div>
+      <div class="scroll-table overflow-x-auto border rounded-lg">
+        <table class="min-w-full text-sm text-left text-gray-700">
+          <thead class="text-xs uppercase bg-purple-100 sticky top-0">
+            <tr>
+              <th class="px-4 py-3">Phone Number</th>
+              <th class="px-4 py-3">Code / OTP</th>
+              <th class="px-4 py-3">Full Message</th>
+              <th class="px-4 py-3">Timestamp</th>
+            </tr>
+          </thead>
+          <tbody id="inbox-table-body" class="divide-y"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function formatDateToYYYYMMDD(date) {
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0'); 
+      const day = String(date.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    }
+    async function fetchNumbers() {
+      const res = await fetch(`/all/number`);
+      const data = await res.json();
+      const tbody = document.getElementById("number-table-body");
+      tbody.innerHTML = "";
+      data.forEach(num => {
+        const row = document.createElement("tr");
+        const expiryDate = formatDateToYYYYMMDD(new Date(num.expiry_date));
+        const extensionDate = formatDateToYYYYMMDD(new Date(num.extension_date));
+        row.innerHTML = `
+        <td class="px-4 py-2">${num.countries}</td>
+        <td class="px-4 py-2">${num.country_code}</td>
+        <td class="px-4 py-2">${num.number}</td>
+          <td class="px-4 py-2"><input type="date" class="expiry-date bg-transparent outline-none" readonly value="${expiryDate || ""}" /></td>
+          <td class="px-4 py-2"><input type="date" class="extension-date bg-transparent outline-none" readonly value="${extensionDate || ""}" /></td>
+          <td class="px-4 py-2 space-x-2">
+            <button onclick="enableEdit(this, '${num.number}')" class="text-blue-600 hover:underline">Edit</button>
+            <button onclick="deleteRow(this, '${num.number}')" class="text-red-600 hover:underline">Delete</button>
+          </td>
+        `;
+        tbody.appendChild(row);
+      });
+      document.getElementById("total-count").textContent = data.length;
+    }
+
+    async function fetchMessages() {
+      const res = await fetch(`/inbox/all`);
+      const data = await res.json();
+      const tbody = document.getElementById("inbox-table-body");
+      tbody.innerHTML = "";
+      data.forEach(msg => {
+        const row = document.createElement("tr");
+        const codeMatch = msg.messages.match(/\b\d{4,8}\b/);
+        let code = "N/A"; 
+        if (codeMatch) {
+          code = codeMatch[0];
+          console.log("Extracted code:", code);
+        }
+        row.innerHTML = `
+          <td class="px-4 py-2">${msg.to_number}</td>
+          <td class="px-4 py-2">${code}</td>
+          <td class="px-4 py-2">${msg.messages}</td>
+          <td class="px-4 py-2">${new Date(msg.time_stamp).toLocaleString()}</td>
+        `;
+        tbody.appendChild(row);
+      });
+    }
+
+    async function addNumber() {
+      const country = document.getElementById("add-country").value.trim();
+      const number = document.getElementById("add-number").value.trim();
+      const country_code = document.getElementById("add-country-code").value.trim();
+      const expiryDate = new Date(document.getElementById("add-expiry").value);
+      const extensionDate = new Date(document.getElementById("add-extension").value);
+      console.log("Adding number:", { country, number, country_code, expiryDate, extensionDate });
+      if (!country || !number) return;
+
+      await fetch(`/add/number`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ countries:country, number:number, country_code:country_code,expiry_date:expiryDate, extension_date:extensionDate })
+      });
+
+      fetchNumbers(); // refresh
+      document.getElementById("add-country").value = "";
+      document.getElementById("add-country-code").value = "";
+      document.getElementById("add-number").value = "";
+      document.getElementById("add-expiry").value = "";
+      document.getElementById("add-extension").value = "";
+    }
+
+    function enableEdit(btn, id) {
+      const row = btn.closest("tr");
+      const countryCell = row.children[0];
+      const countryCodeCell = row.children[1];
+      const numberCell = row.children[2];
+
+      const currentCountry = countryCell.textContent.trim();
+      const currentNumber = numberCell.textContent.trim();
+      const countryCode = countryCodeCell.textContent.trim();
+      countryCell.innerHTML = `<input type="text" value="${currentCountry}" class="border p-1 rounded w-full" />`;
+      countryCodeCell.innerHTML = `<input type="text" value="${countryCode}" class="border p-1 rounded w-full" />`;
+      numberCell.innerHTML = `<input type="text" value="${currentNumber}" class="border p-1 rounded w-full" />`;
+
+      row.querySelectorAll("input[type='date']").forEach(input => {
+        input.removeAttribute("readonly");
+        input.classList.add("border", "p-1", "rounded", "bg-white");
+      });
+
+      btn.textContent = "Save";
+      btn.onclick = function () {
+        saveRow(this);
+      };
+    }
+
+    async function saveRow(btn) {
+      const row = btn.closest("tr");
+      const country = row.children[0].querySelector("input").value.trim();
+      console.log("Saving row for country:", country);
+      const country_code = row.children[1].querySelector("input").value.trim();
+      console.log("Saving row for country code:", country_code);
+      const number = row.children[2].querySelector("input").value.trim();
+            console.log("Saving row for number:", number);
+      const expiryDate = new Date(row.children[3].querySelector("input").value);
+            console.log("Saving row for expiry date:", expiryDate);
+      const extensionDate = new Date(row.children[4].querySelector("input").value);
+            console.log("Saving row for extension date:", extensionDate);
+
+      await fetch(`/numbers/save`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ countries:country, number:number, country_code:country_code, expiry_date:expiryDate, extension_date:extensionDate })
+      });
+
+      fetchNumbers(); // refresh
+    }
+
+    async function deleteRow(btn, id) {
+  const encodedId = encodeURIComponent(id); // encodes '+' to '%2B'
+  await fetch(`/number/delete?number=${encodedId}`, {
+    method: "DELETE",
+    headers: {
+      "Content-Type": "application/json"
+    }
+  });
+  fetchNumbers();
+}
+
+
+    function filterInbox() {
+      const search = document.getElementById("search-inbox").value.toLowerCase();
+      const rows = document.querySelectorAll("#inbox-table-body tr");
+      rows.forEach(row => {
+        const phone = row.children[0].textContent.toLowerCase();
+        row.style.display = phone.includes(search) ? "" : "none";
+      });
+    }
+
+    if (sessionStorage.getItem("isLoggedIn") !== "true") {
+      window.location.href = "login.html";
+    } else {
+      fetchNumbers();
+      fetchMessages();
+    }
+  </script>
+</body>
+</html>
