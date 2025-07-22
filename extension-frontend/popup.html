@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="referrer" content="no-referrer-when-downgrade" />
+  <meta http-equiv="Content-Security-Policy" content="connect-src 'self' https://extension-dashboard-backend-latest.onrender.com;">
+
+  <title>KrispCall Number Generator</title>
+  <link rel="stylesheet" href="popup.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+
+<body>
+  <div class="extension-container">
+    <div class="header">
+      <div class="top">
+        <img src="icons/Krispcall-Logo.png" alt="logo" width="100px" />
+        <h1 class="header-title">Number Generator</h1>
+      </div>
+    </div>
+
+    <div class="container">
+      <div id="generator-section" class="middle">
+        <div class="form-group">
+          <p class="header-p-tag">Displaying Numbers from</p>
+          <div id="country-search-container" style="position: relative;" class="con-search">
+            <div id="country-dropdown-trigger" class="search-country-bar">
+              <div id="selected-country" class=select-country>Select Country</div>
+              <div class="dropdown-icon"></div>
+            </div>
+
+            <div id="country-dropdown" class="country-drop" style="display: none; ">
+              <div class="dro-items">
+                <div class="input-icon"></div>
+                <input type="text" id="dropdown-search" placeholder="Search..." class="dropdown-search-input" />
+              </div>
+              <div id="country-options"></div>
+            </div>
+          </div>
+        </div>
+
+        <div id="loading-spinner" class="loading-spinner">
+          <div class="simple-loader"></div>
+
+        </div>
+        <div class="toggle-tabs" id="tabs-toggle" style="display: none;">
+          <button id="tab-special" class="tab-btn active">Received OTP</button>
+          <button id="tab-krispcall" class="tab-btn">KrispCall Number</button>
+        </div>
+
+        <div id="special-numbers" class="special-auto" style="display: none;">
+          <div class="results-header">
+            <p class="results-title" id="real-num">Receive real time OTPs here.</p>
+          </div>
+          <div id="special-numbers-container" class="special-numbers-containers"></div>
+        </div>
+      </div>
+
+      <div id="results" class="random-auto" style="display: none">
+        <div class="results-header">
+          <p class="results-title">Get KrispCall numbers here</p>
+          <span id="fetchBtn" class="fetchBtn">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 118.04 122.88">
+              <path
+                d="M16.08,59.26A8,8,0,0,1,0,59.26a59,59,0,0,1,97.13-45V8a8,8,0,1,1,16.08,0V33.35a8,8,0,0,1-8,8L80.82,43.62a8,8,0,1,1-1.44-15.95l8-.73A43,43,0,0,0,16.08,59.26Zm22.77,19.6a8,8,0,0,1,1.44,16l-10.08.91A42.95,42.95,0,0,0,102,63.86a8,8,0,0,1,16.08,0A59,59,0,0,1,22.3,110v4.18a8,8,0,0,1-16.08,0V89.14h0a8,8,0,0,1,7.29-8l25.31-2.3Z" />
+            </svg>
+          </span>
+
+        </div>
+        <div id="numbers-container"></div>
+      </div>
+
+      <div id="error-message" class="error"></div>
+
+
+    </div>
+    <div class="footer">
+      <p>Didn't get the OTP
+        <span class="footer-num">Get a krispcall Number</span>
+      </p>
+      <a href="https://app.krispcall.com/register" target="_blank" class="footer-btn">
+        Get Private Number
+      </a>
+
+    </div>
+    <span id="copy-message" class="copy-message">Number Copied to clipboard</span>
+  </div>
+
+  <script src="libs/socket.io.min.js"></script>
+  <script type="module" src="popup.js"></script>
+</body>
+
+</html>

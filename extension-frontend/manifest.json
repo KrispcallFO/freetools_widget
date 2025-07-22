@@ -1,0 +1,49 @@
+{
+  "manifest_version": 3,
+  "name": "KrispCall Number Generator",
+  "version": "1.0",
+  "description": "Generate valid random phone numbers by country, area, and type. CSV export. KrispCall branded.",
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": "icons/icon128.png"
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://app.krispcall.com/*"
+      ],
+      "js": [
+        "libs/socket.io.min.js"
+      ]
+    }
+  ],
+  "permissions": [
+    "cookies",
+    "storage"
+  ],
+  "host_permissions": [
+    "https://app.krispcall.com/*",
+    "https://n8n.townizautomation.com/*",
+    "https://flagcdn.com/*",
+    "https://fo.townizautomation.com/*",
+    "https://extension-dashboard-backend-latest.onrender.com/*"
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "countries.json"
+      ],
+      "matches": [
+        "<all_urls>"
+      ]
+    }
+  ],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'; connect-src 'self' https://fo.townizautomation.com wss://fo.townizautomation.com ws://localhost:3000 https://app.krispcall.com https://n8n.townizautomation.com https://flagcdn.com https://extension-dashboard-backend-latest.onrender.com"
+  }
+}
