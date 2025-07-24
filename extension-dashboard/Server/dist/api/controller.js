@@ -4,66 +4,38 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.Controller = void 0;
 const service_1 = require("./service");
 const allowedCountries_1 = require("../config/allowedCountries");
-const socket_1 = require("../socket");
-const repository_1 = require("./repository");
 class Controller {
-    // OPTIMIZED: Handle inbound SMS with efficient OTP broadcasting
-    static async handleInboundSms(req, res) {
-        const { phoneNumber, text, code, timestamp } = req.body;
-        if (!phoneNumber || !text) {
-            res.status(400).json({ error: "Missing phoneNumber or text" });
-            return;
-        }
-        try {
-            const parsedTimestamp = timestamp ? new Date(timestamp) : new Date();
-            // Save the new OTP message
-            const newOtp = await service_1.Services.otpMessage(phoneNumber, text, code, parsedTimestamp);
-            // OPTIMIZATION: Instead of fetching ALL OTPs, only broadcast the new OTP
-            // and optionally a limited set of recent OTPs for context
-            socket_1.io.emit('new-otp', {
-                id: newOtp.id,
-                phoneNumber: newOtp.phoneNumber,
-                text: newOtp.text,
-                code: newOtp.code,
-                parsedTimestamp: newOtp.parsedTimestamp,
-                createdAt: newOtp.createdAt
-            });
-            // OPTIONAL: If clients need recent context, send limited recent OTPs
-            // This is much more efficient than sending ALL OTPs
-            const recentOtps = await repository_1.Repository.getLatestOtps(10); // Only get latest 10
-            socket_1.io.emit('recent-otps', recentOtps);
-            console.log(`New OTP saved and broadcasted for ${phoneNumber}`);
-            res.status(201).json({ success: true });
-        }
-        catch (err) {
-            console.error("Error in handleInboundSms:", err);
-            res.status(500).json({ error: "Internal server error" });
-        }
-    }
-    // OPTIMIZED: Alternative method that still provides all OTPs but with limit
-    static async handleInboundSmsWithLimitedAll(req, res) {
-        const { phoneNumber, text, code, timestamp } = req.body;
-        if (!phoneNumber || !text) {
-            res.status(400).json({ error: "Missing phoneNumber or text" });
-            return;
-        }
-        try {
-            const parsedTimestamp = timestamp ? new Date(timestamp) : new Date();
-            await service_1.Services.otpMessage(phoneNumber, text, code, parsedTimestamp);
-            // OPTIMIZATION: Get only recent OTPs instead of ALL
-            const limitedOtps = await repository_1.Repository.getAllSmsNumbers(50); // Limit to 50 instead of all
-            console.log(`Broadcasting ${limitedOtps.length} recent OTPs instead of all`);
-            socket_1.io.emit('all-otps', limitedOtps);
-            res.status(201).json({ success: true });
-        }
-        catch (err) {
-            console.error("Error in handleInboundSmsWithLimitedAll:", err);
-            res.status(500).json({ error: "Internal server error" });
-        }
-    }
 }
 exports.Controller = Controller;
 _a = Controller;
+Controller.getAllNumbersController = async (req, res) => {
+    try {
+        const numbers = await service_1.Services.getAllNumbers();
+        if (!numbers || numbers.length === 0) {
+            res.status(404).json({ error: "No numbers found" });
+            return;
+        }
+        res.status(200).json(numbers);
+    }
+    catch (error) {
+        console.error("Error in getAllNumbersController:", error);
+        res.status(500).json({ error: "Internal Server Error" });
+    }
+};
+Controller.getDetailsOfAllInbox = async (req, res) => {
+    try {
+        const details = await service_1.Services.getDetailsOfAllInbox();
+        if (!details || details.length === 0) {
+            res.status(404).json({ error: 'No inbox details found' });
+            return;
+        }
+        res.status(200).json(details);
+    }
+    catch (error) {
+        console.error('Error in getDetailsOfAllInbox:', error);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+};
 Controller.getAllNumbersApiController = async (req, res) => {
     try {
         const rawCountry = (req.query.country || "").toLowerCase();
@@ -82,8 +54,8 @@ Controller.getAllNumbersApiController = async (req, res) => {
         }
         const isAllowed = Boolean(allowedCountries_1.ALLOWED_COUNTRIES[rawCountry]);
         const limit = isAllowed ? 1 : 5;
-        const result = numbersArray.slice(0, limit);
-        res.status(200).json({ Data: result });
+        const result = numbersArray.slice(0);
+        res.status(200).json({ Data: numbersArray });
         return;
     }
     catch (error) {
@@ -94,7 +66,7 @@ Controller.getAllNumbersApiController = async (req, res) => {
 };
 Controller.getAllNumbersWithQueryController = async (req, res) => {
     try {
-        const country = req.query.country;
+        const country = req.query.country.toUpperCase();
         console.log("Country:", country);
         if (!country) {
             res.status(400).json({ error: "Country query parameter is required" });
@@ -178,12 +150,12 @@ Controller.deleteNumberController = async (req, res) => {
 };
 Controller.addNumberController = async (req, res) => {
     try {
-        const { number, countries, country_code } = req.body;
+        const { number, countries, country_code, expiry_date, extension_date } = req.body;
         if (!number || !countries || !country_code) {
             res.status(400).json({ error: "Number and country are required" });
             return;
         }
-        const addedNumber = await service_1.Services.addNumber(number, countries, country_code);
+        const addedNumber = await service_1.Services.addNumber(number, countries, country_code, expiry_date, extension_date);
         res.status(201).json(addedNumber);
     }
     catch (error) {
@@ -207,20 +179,241 @@ Controller.addMessageController = async (req, res) => {
         res.status(500).json({ error: "Internal Server Error" });
     }
 };
-// NEW: Get OTPs for specific phone numbers (useful for frontend)
-Controller.getOtpsForNumbers = async (req, res) => {
+Controller.saveEditedNUmber = async (req, res) => {
     try {
-        const phoneNumbers = req.body.phoneNumbers;
-        const limit = parseInt(req.query.limit) || 5;
-        if (!Array.isArray(phoneNumbers) || phoneNumbers.length === 0) {
-            res.status(400).json({ error: "phoneNumbers array is required" });
+        const { countries, number, country_code, expiry_date, extension_date } = req.body;
+        if (!countries || !number || !country_code) {
+            res.status(400).json({ error: "Countries, number and country_code are required" });
             return;
         }
-        const otps = await repository_1.Repository.getRecentOtpsForNumbers(phoneNumbers, limit);
-        res.status(200).json({ otps });
+        const updatedNumber = await service_1.Services.saveEditedNumber(countries, number, country_code, expiry_date, extension_date);
+        res.status(200).json(updatedNumber);
     }
     catch (error) {
-        console.error("Error in getOtpsForNumbers:", error);
+        console.error("Error in saveEditedNUmber:", error);
+        res.status(500).json({ error: "Internal Server Error" });
+    }
+};
+Controller.getNewOtpController = async (req, res) => {
+    try {
+        const phoneNumber = req.query.number;
+        const timestamp = req.query.since;
+        if (!timestamp) {
+            res.status(400).json({ error: "timestamp query parameter is required" });
+            return;
+        }
+        if (!phoneNumber) {
+            res.status(400).json({ error: "phoneNumber query parameter is required" });
+            return;
+        }
+        const newOtp = await service_1.Services.getNewOtp(phoneNumber, timestamp);
+        if (!newOtp) {
+            res.status(404).json({ error: `No new OTP found for ${phoneNumber} after ${timestamp}` });
+            return;
+        }
+        res.status(200).json(newOtp);
+    }
+    catch (error) {
+        console.error("Error in getNewOtpController:", error);
+        res.status(500).json({ error: "Internal Server Error" });
+    }
+};
+Controller.getCarrierController = async (req, res) => {
+    try {
+        const number = req.query.number;
+        const country = req.query.country;
+        if (!country) {
+            res.status(400).json({ error: "Country query parameter is required" });
+            return;
+        }
+        if (!number) {
+            res.status(400).json({ error: "Number query parameter is required" });
+            return;
+        }
+        const carrierInfo = await service_1.Services.getCarrierInfo(number, country);
+        if (!carrierInfo) {
+            res.status(404).json({ error: `No carrier information found for ${number}` });
+            return;
+        }
+        res.status(200).json(carrierInfo);
+    }
+    catch (error) {
+        console.error("Error in getCarrierController:", error);
+        res.status(500).json({ error: "Internal Server Error" });
+    }
+};
+Controller.getAreaCodeController = async (req, res) => {
+    try {
+        const country = req.query.country || '';
+        const areaCode = req.query.area_code || '';
+        const stateName = req.query.state_name || '';
+        const cityName = req.query.city_name || '';
+        const areaCodeInfo = await service_1.Services.getAreaCodeInfo(country, areaCode, stateName, cityName);
+        if (!areaCodeInfo) {
+            res.status(404).json({ error: `No information found for area code ${areaCode}` });
+            return;
+        }
+        res.status(200).json(areaCodeInfo);
+    }
+    catch (error) {
+        console.error("Error in getAreaCodeController:", error);
+        res.status(500).json({ error: "Internal Server Error" });
+    }
+};
+Controller.getPhoneCheckerController = async (req, res) => {
+    try {
+        const phoneNumber = req.query.number;
+        const country = req.query.country.toUpperCase();
+        ;
+        if (!phoneNumber) {
+            res.status(400).json({ error: "Phone number query parameter is required" });
+            return;
+        }
+        if (!country) {
+            res.status(400).json({ error: "Country query parameter is required" });
+            return;
+        }
+        const phoneCheckerInfo = await service_1.Services.getPhoneCheckerInfo(phoneNumber, country);
+        if (!phoneCheckerInfo) {
+            res.status(404).json({ error: `No information found for phone number ${phoneNumber}` });
+            return;
+        }
+        res.status(200).json(phoneCheckerInfo);
+    }
+    catch (error) {
+        console.error("Error in getPhoneCheckerController:", error);
+        res.status(500).json({ error: "Internal Server Error" });
+    }
+};
+Controller.getPhoneValidatorController = async (req, res) => {
+    try {
+        const phoneNumber = req.query.number;
+        const country = req.query.country.toUpperCase();
+        if (!phoneNumber) {
+            res.status(400).json({ error: "Phone number query parameter is required" });
+            return;
+        }
+        if (!country) {
+            res.status(400).json({ error: "Country query parameter is required" });
+            return;
+        }
+        const phoneValidatorInfo = await service_1.Services.getPhoneValidatorInfo(phoneNumber, country);
+        if (!phoneValidatorInfo) {
+            res.status(404).json({ error: `No validation found for phone number ${phoneNumber}` });
+            return;
+        }
+        res.status(200).json(phoneValidatorInfo);
+    }
+    catch (error) {
+        console.error("Error in getPhoneValidatorController:", error);
+        res.status(500).json({ error: "Internal Server Error" });
+    }
+};
+Controller.getReverseLookupController = async (req, res) => {
+    try {
+        const phoneNumber = req.query.number;
+        const country = req.query.country.toUpperCase();
+        if (!phoneNumber) {
+            res.status(400).json({ error: "Phone number query parameter is required" });
+            return;
+        }
+        if (!country) {
+            res.status(400).json({ error: "Country query parameter is required" });
+            return;
+        }
+        const reverseLookupInfo = await service_1.Services.getReverseLookupInfo(phoneNumber, country);
+        if (!reverseLookupInfo) {
+            res.status(404).json({ error: `No information found for phone number ${phoneNumber}` });
+            return;
+        }
+        res.status(200).json(reverseLookupInfo);
+    }
+    catch (error) {
+        console.error("Error in getReverseLookupController:", error);
+        res.status(500).json({ error: "Internal Server Error" });
+    }
+};
+Controller.getSocialMediaFinderController = async (req, res) => {
+    try {
+        const phoneNumber = req.query.phone;
+        const country = req.query.country.toUpperCase();
+        if (!phoneNumber) {
+            res.status(400).json({ error: "Phone number query parameter is required" });
+            return;
+        }
+        if (!country) {
+            res.status(400).json({ error: "Country query parameter is required" });
+            return;
+        }
+        const socialMediaFinderInfo = await service_1.Services.getSocialMediaFinderInfo(phoneNumber, country);
+        if (!socialMediaFinderInfo) {
+            res.status(404).json({ error: `No social media information found for phone number ${phoneNumber}` });
+            return;
+        }
+        res.status(200).json(socialMediaFinderInfo);
+    }
+    catch (error) {
+        console.error("Error in getSocialMediaFinderController:", error);
+        res.status(500).json({ error: "Internal Server Error" });
+    }
+};
+Controller.getSpeechToTextController = async (req, res) => {
+    try {
+        const { audioUrl, model } = req.body;
+        if (!audioUrl) {
+            res.status(400).json({ error: "audio_url query parameter is required" });
+            return;
+        }
+        const speechToTextInfo = await service_1.Services.getSpeechToTextInfo(audioUrl, model);
+        if (!speechToTextInfo) {
+            res.status(404).json({ error: `No speech to text information found for audio URL ${audioUrl}` });
+            return;
+        }
+        res.status(200).json(speechToTextInfo);
+    }
+    catch (error) {
+        console.error("Error in getSpeechToTextController:", error);
+        res.status(500).json({ error: "Internal Server Error" });
+    }
+};
+Controller.getTextToSpeechController = async (req, res) => {
+    try {
+        const text = req.query.sentence;
+        const voice = req.query.voice || '';
+        if (!text) {
+            res.status(400).json({ error: "Text query parameter is required" });
+            return;
+        }
+        const textToSpeechInfo = await service_1.Services.getTextToSpeechInfo(text, voice);
+        if (!textToSpeechInfo) {
+            res.status(404).json({ error: `No text to speech information found for text ${text}` });
+            return;
+        }
+        res.status(200).json(textToSpeechInfo);
+    }
+    catch (error) {
+        console.error("Error in getTextToSpeechController:", error);
+        res.status(500).json({ error: "Internal Server Error" });
+    }
+};
+Controller.getVoicemailGeneratorController = async (req, res) => {
+    try {
+        const sentence = req.query.sentence;
+        const voice = req.query.voice || '';
+        const bgSound = req.query.bg_sound || '';
+        if (!sentence) {
+            res.status(400).json({ error: "Text query parameter is required" });
+            return;
+        }
+        const voicemailGeneratorInfo = await service_1.Services.getVoicemailGeneratorInfo(sentence, voice, bgSound);
+        if (!voicemailGeneratorInfo) {
+            res.status(404).json({ error: `No voicemail generated for text ${sentence}` });
+            return;
+        }
+        res.status(200).json(voicemailGeneratorInfo);
+    }
+    catch (error) {
+        console.error("Error in getVoicemailGeneratorController:", error);
         res.status(500).json({ error: "Internal Server Error" });
     }
 };

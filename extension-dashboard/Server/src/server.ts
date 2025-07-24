@@ -4,7 +4,7 @@ import app from "./index";
 import http from "http";
 // import { initSocket } from "./socket";
 
-const PORT = Number(process.env.PORT) || 3000;
+const PORT = Number(process.env.PORT) || 8123;
 const server = http.createServer(app);
 // initSocket(server);
 

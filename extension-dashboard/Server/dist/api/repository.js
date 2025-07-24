@@ -3,13 +3,42 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.Repository = void 0;
 const client_1 = require("@prisma/client");
 class Repository {
-    static async addNumber(country, number, country_code) {
+    static async getAllNumbersFromDatabase() {
+        try {
+            return await this.prisma.countries_Number.findMany({
+                orderBy: {
+                    number: "asc",
+                },
+            });
+        }
+        catch (error) {
+            console.error("Error fetching all numbers from database:", error);
+            throw error;
+        }
+    }
+    static async getAllMessages() {
+        try {
+            const messages = await this.prisma.otpMessages.findMany({
+                orderBy: {
+                    parsedTimestamp: "desc",
+                },
+            });
+            return messages.map((msg) => msg.text);
+        }
+        catch (error) {
+            console.error("Error fetching all messages:", error);
+            throw error;
+        }
+    }
+    static async addNumber(country, number, country_code, expiry_date, extension) {
         try {
             await this.prisma.countries_Number.create({
                 data: {
                     countries: country,
                     country_code: country_code,
                     number: number,
+                    expiry_date: expiry_date,
+                    extension_date: extension,
                 },
             });
             console.log(`Number ${number} added for country ${country}`);
@@ -22,13 +51,15 @@ class Repository {
             throw error;
         }
     }
-    static async addNumberToCountry(text, code, phoneNumber) {
+    static async addNumberToCountry(text, code, phoneNumber, expiry_date, extension) {
         try {
             const createdEntry = await this.prisma.countries_Number.create({
                 data: {
                     countries: text,
                     country_code: code,
                     number: phoneNumber,
+                    expiry_date: expiry_date,
+                    extension_date: extension,
                 },
             });
             console.log(`✅ Number ${phoneNumber} added for country ${text}`);
@@ -99,82 +130,12 @@ class Repository {
             throw error;
         }
     }
-    //   static async login(email: string, password: string): Promise < { token: string, userId: number } > {
-    //   try {
-    //     // Find user by email
-    //     const user = await this.prisma.user.findUnique({
-    //       where: { email },
-    //     });
-    //     if(!user) {
-    //       throw new Error('Invalid email or password');
-    //     }
-    //       // Compare hashed password
-    //       const isPasswordValid = await bcrypt.compare(password, user.password);
-    //     if(!isPasswordValid) {
-    //       throw new Error('Invalid email or password');
-    //     }
-    //       console.log(`✅ User logged in: ${email}`);
-    //     // For real apps, return a JWT or session token
-    //     return {
-    //       token: 'dummy-auth-token',  // replace with actual JWT token
-    //       userId: user.id,
-    //     };
-    //   } catch(error) {
-    //     console.error(`❌ Login failed for email ${email}:`, error);
-    //     throw new Error(error instanceof Error ? error.message : 'Database error during login');
-    //   }
-    // }
     // Get all sms 
     static async getSmsNumbers() {
         return await this.prisma.otpMessages.findMany({
             orderBy: {
                 parsedTimestamp: "desc",
             },
-        });
-    }
-    // OPTIMIZED: Create OTP message
-    static async otpMessage(phoneNumber, text, code, parsedTimestamp) {
-        return await this.prisma.otpMessages.create({
-            data: {
-                phoneNumber,
-                text,
-                code,
-                parsedTimestamp: parsedTimestamp ?? new Date(),
-            },
-        });
-    }
-    // OPTIMIZED: Get limited recent SMS numbers instead of all
-    static async getAllSmsNumbers(limit = 50) {
-        return await this.prisma.otpMessages.findMany({
-            orderBy: {
-                parsedTimestamp: "desc",
-            },
-            take: limit, // Limit the number of records returned
-        });
-    }
-    // NEW: Get recent OTPs for specific phone numbers (for initial socket load)
-    static async getRecentOtpsForNumbers(phoneNumbers, limit = 5) {
-        if (!phoneNumbers.length)
-            return [];
-        return await this.prisma.otpMessages.findMany({
-            where: {
-                phoneNumber: {
-                    in: phoneNumbers,
-                },
-            },
-            orderBy: {
-                parsedTimestamp: "desc",
-            },
-            take: limit * phoneNumbers.length, // Get top N for each number
-        });
-    }
-    // NEW: Get latest OTPs (for broadcasting new OTPs only)
-    static async getLatestOtps(limit = 10) {
-        return await this.prisma.otpMessages.findMany({
-            orderBy: {
-                parsedTimestamp: "desc",
-            },
-            take: limit,
         });
     }
     // OPTIMIZED: Get OTPs for a specific phone number with limit
@@ -197,6 +158,7 @@ class Repository {
                     to_number: true,
                     messages: true,
                     from_number: true,
+                    time_stamp: true,
                 },
             });
             if (!details) {
@@ -225,6 +187,73 @@ class Repository {
         }
         catch (error) {
             console.error("Error adding messages to number:", error);
+            throw error;
+        }
+    }
+    static async getDetailsOfAllInbox() {
+        try {
+            const inbox = await this.prisma.number_Details.findMany({
+                select: {
+                    to_number: true,
+                    messages: true,
+                    from_number: true,
+                    time_stamp: true
+                }
+            });
+            if (!inbox || inbox.length === 0) {
+                console.log('No messages found in inbox');
+                return [];
+            }
+            console.log('Inbox details:', inbox);
+            return JSON.parse(JSON.stringify(inbox));
+        }
+        catch (error) {
+            console.error('Error fetching inbox details:', error);
+            throw error;
+        }
+    }
+    static async saveEditedNumber(countries, number, country_code, expiry_date, extension_date) {
+        try {
+            const updatedNumber = await this.prisma.countries_Number.update({
+                where: { number: number },
+                data: {
+                    countries: countries,
+                    number: number,
+                    country_code: country_code,
+                    expiry_date: expiry_date,
+                    extension_date: extension_date
+                },
+            });
+            console.log(`Number ${number} updated successfully`);
+            return JSON.parse(JSON.stringify(updatedNumber));
+        }
+        catch (error) {
+            console.error("Error updating number:", error);
+            throw error;
+        }
+    }
+    static async getNewOtp(phoneNumber, timestamp) {
+        try {
+            if (!phoneNumber) {
+                throw new Error("phoneNumber is required");
+            }
+            const newOtp = await this.prisma.number_Details.findMany({
+                where: {
+                    to_number: phoneNumber,
+                    time_stamp: { gt: new Date(timestamp) }
+                },
+                orderBy: {
+                    time_stamp: "asc",
+                },
+                take: 10,
+            });
+            if (!newOtp) {
+                throw new Error(`No OTP found for the phone number ${phoneNumber}`);
+            }
+            return newOtp;
+        }
+        catch (error) {
+            console.error("Error fetching new OTP:", error);
             throw error;
         }
     }

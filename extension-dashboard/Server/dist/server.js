@@ -7,12 +7,12 @@ const path_1 = __importDefault(require("path"));
 const express_1 = __importDefault(require("express"));
 const index_1 = __importDefault(require("./index"));
 const http_1 = __importDefault(require("http"));
-const socket_1 = require("./socket");
+// import { initSocket } from "./socket";
 const PORT = Number(process.env.PORT) || 3000;
 const server = http_1.default.createServer(index_1.default);
-(0, socket_1.initSocket)(server);
+// initSocket(server);
 // Correct path resolution for inside Docker
-const frontendPath = path_1.default.join(__dirname, "..", "..", "Client", "public");
+const frontendPath = path_1.default.join(__dirname, "..", "public");
 index_1.default.use(express_1.default.static(frontendPath, {
     maxAge: "30d",
     etag: false,
@@ -28,7 +28,7 @@ index_1.default.get("/", (_req, res) => {
 index_1.default.get("/test", (req, res) => {
     res.status(200).json({ success: true, message: "Working Fine 😁" });
 });
-server.listen(PORT, () => {
+server.listen(PORT, "0.0.0.0", () => {
     console.log(`✅ Server running on port ${PORT}`);
 });
 process.on("uncaughtException", (err) => {

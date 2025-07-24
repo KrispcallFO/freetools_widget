@@ -1,10 +1,14 @@
 import { sendToken } from "../utils/jwt";
 import { Repository } from "./repository";
-import bcrypt  from 'bcrypt'
 import type { Response } from 'express';
+import FormData from 'form-data';
+import axios from 'axios';
+import { Readable } from 'stream';
 
 
 export class Services {
+
+  static apiUrl = process.env.api_url;
   static getAllNumbers(): Promise<any[]> {
       try {
         return Repository.getAllNumbersFromDatabase();
@@ -16,7 +20,7 @@ export class Services {
   
   static async getAllNumbersAPI(country: string): Promise<any[]> {
     try {
-      const url = `https://freetoolsv3.marktivities.guru/api/phone/number-generator/?country=${country}`;
+      const url = this.apiUrl+`/phone/number-generator/?country=${country}`;
       const Param = {
         country: country,
       };
@@ -240,7 +244,7 @@ static async getDetailsOfAllInbox(): Promise<JSON[]> {
       if (!apiKey) {
         throw new Error("Carrier API key is missing in environment variables");
       }
-      const url = `https://freetoolsv3.marktivities.guru/api/phone/carrier/?number=${phoneNumber}&country=${country}`;
+      const url = this.apiUrl+`/phone/carrier/?number=${phoneNumber}&country=${country}`;
       const headers = {
         "api-key": apiKey,
       };
@@ -261,7 +265,7 @@ static async getDetailsOfAllInbox(): Promise<JSON[]> {
       if (!apiKey) {
         throw new Error("Area code API key is missing in environment variables");
       }
-      const url = `https://freetoolsv3.marktivities.guru/api/areaCode/area-code/?country=${country}&area_code=${areaCode}&state_name=${stateName}&city_name=${cityName}`;
+      const url = this.apiUrl+`/areaCode/area-code/?country=${country}&area_code=${areaCode}&state_name=${stateName}&city_name=${cityName}`;
       const headers = {
         "api-key": apiKey,
       };
@@ -289,7 +293,7 @@ static async getDetailsOfAllInbox(): Promise<JSON[]> {
       if (!apiKey) {
         throw new Error("Phone checker API key is missing in environment variables");
       }
-      const url = `https://freetoolsv3.marktivities.guru/api/phone/checker/?number=${phoneNumber}&country=${country}`;
+      const url = this.apiUrl+`/phone/checker/?number=${phoneNumber}&country=${country}`;
       const headers = {
         "api-key": apiKey,
       };
@@ -317,7 +321,7 @@ static async getDetailsOfAllInbox(): Promise<JSON[]> {
       if (!apiKey) {
         throw new Error("Phone validator API key is missing in environment variables");
       }
-      const url = `https://freetoolsv3.marktivities.guru/api/phone/validator/?number=${phoneNumber}&country=${country}`;
+      const url = this.apiUrl+`/phone/validator/?number=${phoneNumber}&country=${country}`;
       const headers = {
         "api-key": apiKey,
       };
@@ -344,7 +348,7 @@ static async getDetailsOfAllInbox(): Promise<JSON[]> {
       if (!apiKey) {
         throw new Error("Reverse lookup API key is missing in environment variables");
       }
-      const url = `https://freetoolsv3.marktivities.guru/api/phone/reverse-lookup/?number=${phoneNumber}&country=${country}`;
+      const url =this.apiUrl+`/phone/reverse-lookup/?number=${phoneNumber}&country=${country}`;
       const headers = {
         "api-key": apiKey,
       };
@@ -371,7 +375,7 @@ static async getDetailsOfAllInbox(): Promise<JSON[]> {
       if (!apiKey) {
         throw new Error("Social media finder API key is missing in environment variables");
       }
-      const url = `https://freetoolsv3.marktivities.guru/api/socialMedia/social-media-finder/?number=${phoneNumber}&country=${country}`;
+      const url = this.apiUrl+`/socialMedia/social-media-finder/?number=${phoneNumber}&country=${country}`;
       const headers = {
         "api-key": apiKey,
       };
@@ -386,47 +390,65 @@ static async getDetailsOfAllInbox(): Promise<JSON[]> {
     }
   }
 
-  public static async getSpeechToTextInfo(audioFile: File, model: string): Promise<JSON> {
-    try {
-      if (!audioFile) {
-        throw new Error("Audio file is required for speech to text conversion");
-      }
-      const apiKey = process.env.speech_to_text_api_key;
-      if (!apiKey) {
-        throw new Error("Speech to text API key is missing in environment variables");
-      }
-      const formData = new FormData();
-      formData.append('audio_file', audioFile);
-      formData.append('model', model);
-      const url = 'https://freetoolsv3.marktivities.guru/api/speech-to-text/';
-      const headers = {
-        "api-key": apiKey,
-      };
-      const response = await fetch(url, {
-        method: 'POST',
-        body: formData,
-        headers: headers,
-      });
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      return await response.json();
-    } catch (error) {
-      console.error("Error fetching speech to text info:", error);
-      throw error;
+ public static async getSpeechToTextInfo(audioFile: Express.Multer.File, model: string): Promise<JSON> {
+  try {
+    if (!audioFile) {
+      throw new Error("Audio file is required for speech to text conversion");
     }
-  }
 
-  public static async getTextToSpeechInfo(text: string, language: string): Promise<JSON> {
+    const apiKey = process.env.number_generator_api_key;
+    if (!apiKey) {
+      throw new Error("Speech to text API key is missing in environment variables");
+    }
+
+    const formData = new FormData();
+
+formData.append('audio_file', audioFile.buffer, {
+  filename: audioFile.originalname,
+  contentType: 'audio/wav',
+  knownLength: audioFile.size, 
+});
+if (model) {
+    formData.append('model', JSON.stringify(model));}
+    const url = this.apiUrl + '/speechTools/speech-to-text/';
+
+    const response = await axios.post(url, formData, {
+      headers: {
+        'api-key': apiKey,
+        ...formData.getHeaders(),
+      },
+      maxBodyLength: Infinity,
+      maxContentLength: Infinity, 
+    });
+
+    return response.data;
+  } catch (error) {
+  if (axios.isAxiosError(error) && error.response) {
+    console.error("API error response data:", error.response.data);
+    console.error("Status:", error.response.status);
+  } else {
+    console.error("Unexpected error:", error);
+  }
+  throw error;
+}
+}
+
+  public static async getTextToSpeechInfo(text: string, language: string): Promise<ArrayBuffer> {
     try {
+      let url = '';
       if (!text) {
         throw new Error("Text is required for text to speech conversion");
       }
-      const apiKey = process.env.text_to_speech_api_key;
+      const apiKey = process.env.number_generator_api_key;
       if (!apiKey) {
         throw new Error("Text to speech API key is missing in environment variables");
       }
-      const url = `https://freetoolsv3.marktivities.guru/api/textTools/text-to-speech/?sentence=${encodeURIComponent(text)}&voice=${language}`;
+      if (!language) {
+        url = this.apiUrl+`/textTools/text-to-speech/?sentence=${encodeURIComponent(text)}`;
+      }
+      else {
+      url = this.apiUrl+`/textTools/text-to-speech/?sentence=${encodeURIComponent(text)}&voice=${language}`;
+      }
       const headers = {
         "api-key": apiKey,
       };
@@ -434,23 +456,33 @@ static async getDetailsOfAllInbox(): Promise<JSON[]> {
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
-      return await response.json();
+      const audioBuffer = await response.arrayBuffer();
+      return (Buffer.from(audioBuffer));
     } catch (error) {
       console.error("Error fetching text to speech info:", error);
       throw error;
     }
   }
 
-  public static async getVoicemailGeneratorInfo(sentence: string, voice: string, bgSound: string): Promise<JSON> {
+  public static async getVoicemailGeneratorInfo(sentence: string, voice: string, bgSound: string): Promise<ArrayBuffer> {
   try{
+    let url = '';
       if (!sentence) {
         throw new Error("Sentence is required for voicemail generation");
       }
-      const apiKey = process.env.voicemail_generator_api_key;
+      const apiKey = process.env.number_generator_api_key;
       if (!apiKey) {
         throw new Error("Voicemail generator API key is missing in environment variables");
       }
-      const url = `https://freetoolsv3.marktivities.guru/api/textTools/voicemail-generator/?sentence=${encodeURIComponent(sentence)}&voice=${voice}&bg_sound=${bgSound}`;
+      if (voice && !bgSound) {
+        url = this.apiUrl+`/textTools/voicemail-generator/?sentence=${encodeURIComponent(sentence)}&voice=${voice}`;}
+      else if (!voice && bgSound) {
+        url = this.apiUrl+`/textTools/voicemail-generator/?sentence=${encodeURIComponent(sentence)}&voice=${voice}&bg_sound=${bgSound}`;}
+      else if (voice && bgSound) {
+        url = this.apiUrl+`/textTools/voicemail-generator/?sentence=${encodeURIComponent(sentence)}&voice=${voice}&bg_sound=${bgSound}`;}
+      else {
+        url = this.apiUrl+`/textTools/voicemail-generator/?sentence=${encodeURIComponent(sentence)}`;
+      }
       const headers = {
         "api-key": apiKey,
       };
@@ -458,7 +490,8 @@ static async getDetailsOfAllInbox(): Promise<JSON[]> {
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
-      return await response.json();
+      const audioBuffer = await response.arrayBuffer();
+      return (Buffer.from(audioBuffer));
     }
     catch (error) {
         console.error("Error fetching voicemail generator info:", error);
