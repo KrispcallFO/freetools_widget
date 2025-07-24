@@ -428,20 +428,22 @@ public static getPhoneCheckerController: RequestHandler = async (
     req: Request, res: Response) => {
     try {
 
-      const {audioUrl, model} = req.body;
-
-      if (!audioUrl) {
-        res.status(400).json({ error: "audio_url query parameter is required" });
+      const audio_file = req.file;
+      const model = req.body.string || '';
+      if (!audio_file) {
+        res.status(400).json({ error: "audio_file parameter is required" });
         return;
       }
-      const speechToTextInfo = await Services.getSpeechToTextInfo(audioUrl,model);
+
+      const speechToTextInfo = await Services.getSpeechToTextInfo(audio_file, model);
+
       if (!speechToTextInfo) {
-        res.status(404).json({ error: `No speech to text information found for audio URL ${audioUrl}` });
+        res.status(404).json({ error: `No speech to text information found for audio URL ${audio_file.originalname}` });
         return;
       }
       res.status(200).json(speechToTextInfo);
     } catch (error) {
-      console.error("Error in getSpeechToTextController:", error);
+      console.error("Error in getSpeechToTextController:");
       res.status(500).json({ error: "Internal Server Error" });
     }
   }
@@ -460,7 +462,9 @@ public static getPhoneCheckerController: RequestHandler = async (
         res.status(404).json({ error: `No text to speech information found for text ${text}` });
         return;
       }
-      res.status(200).json(textToSpeechInfo);
+      res.setHeader("Content-Type", "audio/mpeg");
+    res.setHeader("Content-Disposition", "inline; filename=voicemail.mp3");
+    res.status(200).send(textToSpeechInfo);
     } catch (error) {
       console.error("Error in getTextToSpeechController:", error);
       res.status(500).json({ error: "Internal Server Error" });
@@ -477,12 +481,14 @@ public static getPhoneCheckerController: RequestHandler = async (
         res.status(400).json({ error: "Text query parameter is required" });
         return;
       }
-      const voicemailGeneratorInfo = await Services.getVoicemailGeneratorInfo(sentence, voice, bgSound);
-      if (!voicemailGeneratorInfo) {
+      const audioBuffer = await Services.getVoicemailGeneratorInfo(sentence, voice, bgSound);
+      if (!audioBuffer) {
         res.status(404).json({ error: `No voicemail generated for text ${sentence}` });
         return;
       }
-      res.status(200).json(voicemailGeneratorInfo);
+        res.setHeader("Content-Type", "audio/mpeg");
+    res.setHeader("Content-Disposition", "inline; filename=voicemail.mp3");
+    res.status(200).send(audioBuffer);
     } catch (error) {
       console.error("Error in getVoicemailGeneratorController:", error);
       res.status(500).json({ error: "Internal Server Error" });

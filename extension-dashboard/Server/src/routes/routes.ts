@@ -1,6 +1,9 @@
 import { Router } from 'express';
 import { Controller } from "../api/controller";
 import { authorizeRoles, isAuthenticated } from '../middlewares/auth';
+import multer from 'multer';
+const upload = multer({ storage: multer.memoryStorage() }); // or use diskStorage
+
 const router = Router();
 
 // check-otp-polling
@@ -32,9 +35,10 @@ router.get('/phone-checker/', Controller.getPhoneCheckerController);
 router.get('/phone-validator/', Controller.getPhoneValidatorController);
 router.get('/reverse-lookup/', Controller.getReverseLookupController);
 router.get('/social-media-finder/', Controller.getSocialMediaFinderController);
-router.post('/speech-to-text/', Controller.getSpeechToTextController);
+router.post("/speech-to-text", upload.single('audio_file'), Controller.getSpeechToTextController);
+
 router.get('/text-to-speech/', Controller.getTextToSpeechController);
-router.get('voicemail-generator', Controller.getVoicemailGeneratorController);
+router.get('/voicemail-generator', Controller.getVoicemailGeneratorController);
 
 
 export default router;
