@@ -1,7 +1,8 @@
 # Node modules
 **/node_modules/
-dist/
-.env
+Server/dist/
+Server/.env
+
 # Logs
 logs
 *.log
