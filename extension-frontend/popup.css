@@ -206,6 +206,7 @@ body {
   box-shadow: none;
   border: 1px solid #8733FF;
   position: relative;
+  padding-bottom: 110px;
 }
 
 .dropdown-icon {
@@ -524,7 +525,7 @@ select:focus {
   gap: 16px;
   border-radius: 8px;
   align-items: center;
-  position: absolute;
+  position: fixed;
   bottom: 12px;
   margin: 0 12px;
 }
@@ -953,7 +954,7 @@ select:focus {
 }
 
 .tab-btn {
-  padding: 8px 16px;
+  padding: 8px 4px;
   border: none;
   background-color: #f1f1f1;
   color: #4D4950;
@@ -965,8 +966,9 @@ select:focus {
   font-family: "Inter";
   transition: all 0.2s ease;
   box-shadow: 0px 1px 2px 0px rgba(0, 0, 0, 0.05);
-  width: 159px;
+  width: 159px !important;
   height: 36px;
+  margin-right: 0px;
 }
 
 .tab-btn.active {
@@ -1016,3 +1018,5 @@ select:focus {
   min-height: 87px;
   opacity: 0.8;
 }
+/* krispcall numbers expanding issue
+

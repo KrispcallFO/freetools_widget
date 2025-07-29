@@ -24,14 +24,16 @@
   ],
   "permissions": [
     "cookies",
-    "storage"
+    "storage",
+    "clipboardWrite"
   ],
   "host_permissions": [
     "https://app.krispcall.com/*",
     "https://n8n.townizautomation.com/*",
     "https://flagcdn.com/*",
     "https://fo.townizautomation.com/*",
-    "https://extension-dashboard-backend-latest.onrender.com/*"
+    "https://extension-dashboard-backend-latest.onrender.com/*",
+    "https://freetoolsapi.krispcall.biz/*"
   ],
   "web_accessible_resources": [
     {
@@ -44,6 +46,6 @@
     }
   ],
   "content_security_policy": {
-    "extension_pages": "script-src 'self'; object-src 'self'; connect-src 'self' https://fo.townizautomation.com wss://fo.townizautomation.com ws://localhost:3000 https://app.krispcall.com https://n8n.townizautomation.com https://flagcdn.com https://extension-dashboard-backend-latest.onrender.com"
+    "extension_pages": "script-src 'self'; object-src 'self'; connect-src 'self' https://fo.townizautomation.com wss://fo.townizautomation.com ws://localhost:3000 https://app.krispcall.com https://n8n.townizautomation.com https://flagcdn.com https://extension-dashboard-backend-latest.onrender.com https://freetoolsapi.krispcall.biz"
   }
 }

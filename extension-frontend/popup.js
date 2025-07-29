@@ -34,13 +34,13 @@ class KrispCallGenerator {
             // this.setupSocketIO();
             this.cleanup(); // Clear any previous polling
 
-// Setup polling per special number
-this.allNumbers
-  .filter(num => num.type === "special")
-  .forEach(num => {
-      this.fetchAndDisplayAllOtps(num, num.id);
-      this.startPollingForNumber(num, num.id);
-  });
+            // Setup polling per special number
+            this.allNumbers
+                .filter(num => num.type === "special")
+                .forEach(num => {
+                    this.fetchAndDisplayAllOtps(num, num.id);
+                    this.startPollingForNumber(num, num.id);
+                });
 
             this.setupTabSwitching();
             this.renderRegularNumbers();
@@ -95,19 +95,17 @@ this.allNumbers
 
         // ✅ Manage polling based on tab
         if (isSpecialTab) {
-    this.cleanup(); // Clear any previous polling
+            this.cleanup(); // Clear any previous polling
 
-// Setup polling per special number
-this.allNumbers
-  .filter(num => num.type === "special")
-  .forEach(num => {
-      this.fetchAndDisplayAllOtps(num, num.id);
-      this.startPollingForNumber(num, num.id);
-  });
-
-            console.log("first")
+            // Setup polling per special number
+            this.allNumbers
+                .filter(num => num.type === "special")
+                .forEach(num => {
+                    this.fetchAndDisplayAllOtps(num, num.id);
+                    this.startPollingForNumber(num, num.id);
+                });
         } else {
-            this.stopOtpPolling(); // Stop polling when switching to "regular" tab
+            this.stopPollingForNumber(); // Stop polling when switching to "regular" tab
         }
     }
 
@@ -131,32 +129,37 @@ this.allNumbers
         }
     }
 
-    // async loadFilteredCountries() {
-    //     try {
-            // const specialRes = await fetch("specialNumbers.json");
-            // const specialData = await specialRes.json();
-            // const specialNumbers = specialData.specialNumbers || {};
-            // const specialCountryCodes = Object.keys(specialNumbers).map((code) =>
-            //     code.toLowerCase()
-            // );
+    async loadFilteredCountries() {
+        try {
+            const allSpecialRes = await fetch("https://freetoolsapi.krispcall.biz/all/number");
+            const allSpecialData = await allSpecialRes.json();
 
-            // const countriesRes = await fetch("countries.json");
-            // const countriesData = await countriesRes.json();
-            // const countries = countriesData.countries || countriesData;
+            const specialCountryCodes = [
+                ...new Set(
+                    allSpecialData
+                        .map(num => num.country_code?.toLowerCase())
+                        .filter(Boolean)
+                )
+            ];
 
-            // if (specialCountryCodes.length > 0) {
-            //     this.filteredCountries = countries.filter(
-            //         (c) => c.cca2 && specialCountryCodes.includes(c.cca2.toLowerCase())
-            //     );
-            // } else {
-            //     this.filteredCountries = countries;
-            // }
-    //     } catch (error) {
-    //         console.log(error);
-    //         console.error("Error loading filtered countries:", error);
-    //         this.filteredCountries = [];
-    //     }
-    // }
+            const countriesRes = await fetch("countries.json");
+            const countriesData = await countriesRes.json();
+            const countries = countriesData.countries || countriesData;
+
+            if (specialCountryCodes.length > 0) {
+                this.filteredCountries = countries.filter(
+                    (c) => c.cca2 && specialCountryCodes.includes(c.cca2.toLowerCase())
+                );
+            } else {
+                this.filteredCountries = countries;
+            }
+
+        } catch (error) {
+            console.log(error);
+            console.error("Error loading filtered countries:", error);
+            this.filteredCountries = [];
+        }
+    }
 
     async fetchCountriesFromAPI() {
         try {
@@ -174,7 +177,7 @@ this.allNumbers
 
     //   async loadSpecialNumbers() {
     //     try {
-    //         const response = await fetch(`https://extension-dashboard-backend-latest.onrender.com/number/?country=${country}`);
+    //         const response = await fetch(`https://freetoolsapi.krispcall.biz/number/?country=${country}`);
     //         if (!response.ok) {
     //             throw new Error(`HTTP error: ${response.status}`);
     //         }
@@ -186,14 +189,17 @@ this.allNumbers
     // }
 
 
-    setupCountrySearchBar() {
+    async setupCountrySearchBar() {
         const trigger = document.getElementById("country-dropdown-trigger");
         const dropdown = document.getElementById("country-dropdown");
         const searchInput = document.getElementById("dropdown-search");
         const optionsContainer = document.getElementById("country-options");
         const selected = document.getElementById("selected-country");
 
-        const defaultCountryCode = "US";
+        const { code } = await chrome.storage.local.get('code');
+        const defaultCountryCode = (code ? code.toUpperCase() : "US");
+
+
         const defaultCountry = this.countries.find(
             (c) => c.code.toUpperCase() === defaultCountryCode
         );
@@ -205,7 +211,7 @@ this.allNumbers
             this.selectedCountryIndex = this.countries.findIndex(
                 (c) => c.code.toUpperCase() === defaultCountryCode
             );
-            this.generateNumbers();
+            await this.generateNumbers();
         }
 
         const renderDropdown = (countryList) => {
@@ -238,6 +244,7 @@ this.allNumbers
                     this.selectedCountryIndex = this.countries.findIndex(
                         (c) => c.code === country.code
                     );
+                    chrome.storage.local.set({ code: country.code });
                     dropdown.style.display = "none";
                     this.generateNumbers();
                 });
@@ -279,7 +286,7 @@ this.allNumbers
             this.showWarning("Generation in progress...");
             return;
         }
-
+        this.loadFilteredCountries();
         const { isValid, error } = this.validateInputs();
         if (!isValid) {
             this.showError(error);
@@ -348,56 +355,31 @@ this.allNumbers
         }
     }
 
- async generateSpecialNumbers(countryCode, countryName) {
+    async generateSpecialNumbers(countryCode, countryName) {
 
-    const specialNumbersRes = await fetch(`https://extension-dashboard-backend-latest.onrender.com/number/?country=${countryCode}`);
-    const specialData = await specialNumbersRes.json();
-    console.log("Special numbers response:", specialData);
+        const specialNumbersRes = await fetch(`https://freetoolsapi.krispcall.biz/number/?country=${countryCode}`);
+        const specialData = await specialNumbersRes.json();
 
-    if (!Array.isArray(specialData) || specialData.length === 0) {
-        console.log("No special numbers available for country:", countryCode);
-        return [];
+        if (!Array.isArray(specialData) || specialData.length === 0) {
+            console.log("No special numbers available for country:", countryCode);
+            return [];
+        }
+        this.loadFilteredCountries();
+        return specialData.map((num) => ({
+            number: typeof num === "string" ? num : num.number || "Unknown Number",
+            country: countryName,
+            isPrivate: false,
+            provider: "KrispCall Special",
+            id: this.generateId(),
+            type: 'special'
+        }));
+
     }
-
-    const allSpecialRes = await fetch("https://extension-dashboard-backend-latest.onrender.com/all/number");
-    const allSpecialData = await allSpecialRes.json();
-
-    const specialCountryCodes = [
-        ...new Set(
-            allSpecialData
-                .map(num => num.country_code?.toLowerCase())
-                .filter(Boolean)
-        )
-    ];
-
-    const countriesRes = await fetch("countries.json");
-    const countriesData = await countriesRes.json();
-    const countries = countriesData.countries || countriesData;
-
-    if (specialCountryCodes.length > 0) {
-        this.filteredCountries = countries.filter(
-            (c) => c.cca2 && specialCountryCodes.includes(c.cca2.toLowerCase())
-        );
-    } else {
-        this.filteredCountries = countries;
-    }
-
-    console.log ("specialData", allSpecialData);
-   return specialData.map((num) => ({
-    number: typeof num === "string" ? num : num.number || "Unknown Number",
-    country: countryName,
-    isPrivate: false,
-    provider: "KrispCall Special",
-    id: this.generateId(),
-    type: 'special'
-}));
-
-}
 
 
 
     async fetchNumbersFromAPI(countryCode, showLoading = true) {
-        const baseUrl = "https://extension-dashboard-backend-latest.onrender.com/number/api";
+        const baseUrl = "https://freetoolsapi.krispcall.biz/number/api";
         const params = new URLSearchParams({ country: countryCode.toLowerCase() });
         const apiUrl = `${baseUrl}?${params.toString()}`;
 
@@ -422,7 +404,6 @@ this.allNumbers
             }
 
             const data = await response.json();
-            console.log("API response:", data);
             if (data.success === false) {
                 throw new Error(data.message || "API error");
             }
@@ -532,30 +513,53 @@ this.allNumbers
 
             container.appendChild(card);
         });
-        this.setupCopyFunctionality(container);
+        this.setupCopyFunctionalities(container);
     }
 
     async renderSpecialNumbers() {
-    const container = this.getSafeElement("#special-numbers-container");
+        const container = this.getSafeElement("#special-numbers-container");
 
-    if (!container) {
-        console.error("Special numbers container not found");
-        return;
-    }
+        if (!container) {
+            console.error("Special numbers container not found");
+            return;
+        }
 
-    const specialNumbers = this.allNumbers.filter(num => num.type === "special");
-    container.innerHTML = "";
+        const specialNumbers = this.allNumbers.filter(num => num.type === "special");
+        container.innerHTML = "";
 
-    const realNumber = document.getElementById("real-num");
+        const realNumber = document.getElementById("real-num");
 
-    if (specialNumbers.length === 0) {
-        const noDataMessage = document.createElement("div");
-        noDataMessage.className = "no-data-message";
+        if (specialNumbers.length === 0) {
+            const noDataMessage = document.createElement("div");
+            noDataMessage.className = "no-data-message";
+            // If there are no special numbers, show the list of countries with special numbers
+            // Always show if filteredCountries is available
+            console.log("Filtered countries:", this.filteredCountries.length);
+            if (this.filteredCountries.length > 0) {
+                try {
+                    const filteredCountries = this.filteredCountries || [];
 
-        try {
-            const filteredCountries = this.filteredCountries || [];
-            noDataMessage.innerHTML = `
-              <p class="no-special">No special number is available for this country. You can choose from other countries.</p>
+                    noDataMessage.innerHTML = `
+              <p class="no-special">SMS Inbox is not available for this country. You can get private numbers from KrispCall or choose one of the countries below.</p>
+              <div class="special-countries-list">
+                ${filteredCountries.map(country => `
+                  <div class="no-special-country clickable-country" data-country-code="${country.cca2}">
+                <img src="${country.flags?.png || country.flags?.svg}" class="country-flag"  alt="${country.cca2} flag" />
+                <span class="no-data">${country.name.common} (${country.cca2.toUpperCase()})</span>
+                  </div>`).join("")}
+              </div>
+            `;
+                } catch (err) {
+                    console.error("Error showing no-special-numbers countries:", err);
+                    noDataMessage.textContent = "Failed to load country data.";
+                }
+            } else {
+                noDataMessage.textContent = "SMS Inbox is not available for this country.";
+            }
+            try {
+                const filteredCountries = this.filteredCountries || [];
+                noDataMessage.innerHTML = `
+              <p class="no-special">SMS Inbox is not available for this country. You can get private numbers from KrispCall or choose one of the countries below.</p>
               <div class="special-countries-list">
                 ${filteredCountries.map(country => `
                   <div class="no-special-country clickable-country" data-country-code="${country.cca2}">
@@ -564,63 +568,63 @@ this.allNumbers
                   </div>`).join("")}
               </div>
             `;
-        } catch (err) {
-            console.error("Error showing no-special-numbers countries:", err);
-            noDataMessage.textContent = "Failed to load country data.";
+            } catch (err) {
+                console.error("Error showing no-special-numbers countries:", err);
+                noDataMessage.textContent = "Failed to load country data.";
+            }
+
+            container.appendChild(noDataMessage);
+
+            document.querySelectorAll(".clickable-country").forEach(el => {
+                el.addEventListener("click", () => {
+                    const selectedCode = el.dataset.countryCode?.toUpperCase();
+                    if (!selectedCode) return;
+
+                    const country = this.countries.find(c => c.code.toUpperCase() === selectedCode);
+                    if (!country) return;
+
+                    const selected = document.getElementById("selected-country");
+                    const dropdown = document.getElementById("country-dropdown");
+                    const searchInput = document.getElementById("dropdown-search");
+
+                    selected.innerHTML = `<img src="${country.flag}" class="country-flag" /> ${country.name} (${country.code.toUpperCase()})`;
+                    this.selectedCountryIndex = this.countries.findIndex(c => c.code.toUpperCase() === selectedCode);
+                    if (searchInput) searchInput.value = country.name;
+                    if (dropdown) dropdown.style.display = "none";
+
+                    if (typeof this.generateNumbers === "function") {
+                        this.generateNumbers();
+                    } else {
+                        console.error("this.generateNumbers is not a function!");
+                    }
+                });
+            });
+
+            if (realNumber) realNumber.classList.add("show");
+            return;
+        } else {
+            if (realNumber) realNumber.classList.remove("show");
         }
 
-        container.appendChild(noDataMessage);
+        const reversedSpecialNumbers = [...specialNumbers].reverse();
 
-        document.querySelectorAll(".clickable-country").forEach(el => {
-            el.addEventListener("click", () => {
-                const selectedCode = el.dataset.countryCode?.toUpperCase();
-                if (!selectedCode) return;
+        reversedSpecialNumbers.forEach((numberObj, index) => {
+            const card = document.createElement("div");
+            card.className = "number-card fade-in";
+            card.style.animationDelay = `${index * 0.1}s`;
+            card.setAttribute("data-type", "special");
 
-                const country = this.countries.find(c => c.code.toUpperCase() === selectedCode);
-                if (!country) return;
+            const uniqueId = numberObj.id;
 
-                const selected = document.getElementById("selected-country");
-                const dropdown = document.getElementById("country-dropdown");
-                const searchInput = document.getElementById("dropdown-search");
+            const matchedCountry = this.filteredCountries.find(
+                (c) => c.name.common === numberObj.country
+            );
 
-                selected.innerHTML = `<img src="${country.flag}" class="country-flag" /> ${country.name} (${country.code.toUpperCase()})`;
-                this.selectedCountryIndex = this.countries.findIndex(c => c.code.toUpperCase() === selectedCode);
-                if (searchInput) searchInput.value = country.name;
-                if (dropdown) dropdown.style.display = "none";
+            const countryHTML = matchedCountry
+                ? `<img src="${matchedCountry.flags.png || matchedCountry.flags.svg}" class="country-flag" alt="${matchedCountry.cca2} flag" />`
+                : "";
 
-                if (typeof this.generateNumbers === "function") {
-                    this.generateNumbers();
-                } else {
-                    console.error("this.generateNumbers is not a function!");
-                }
-            });
-        });
-
-        if (realNumber) realNumber.classList.add("show");
-        return;
-    } else {
-        if (realNumber) realNumber.classList.remove("show");
-    }
-
-    const reversedSpecialNumbers = [...specialNumbers].reverse();
-
-    reversedSpecialNumbers.forEach((numberObj, index) => {
-        const card = document.createElement("div");
-        card.className = "number-card fade-in";
-        card.style.animationDelay = `${index * 0.1}s`;
-        card.setAttribute("data-type", "special");
-
-        const uniqueId = numberObj.id;
-
-        const matchedCountry = this.filteredCountries.find(
-            (c) => c.name.common === numberObj.country
-        );
-
-        const countryHTML = matchedCountry
-            ? `<img src="${matchedCountry.flags.png || matchedCountry.flags.svg}" class="country-flag" alt="${matchedCountry.cca2} flag" />`
-            : "";
-
-        card.innerHTML = `
+            card.innerHTML = `
           <div class="phone-row">
             <div>
               <div class="same-row">
@@ -650,47 +654,47 @@ this.allNumbers
           </div>
         `;
 
-        container.appendChild(card);
+            container.appendChild(card);
 
-        const otpButton = card.querySelector(".generate-otp-btn");
-        const otpPanel = card.querySelector(`#otp-${uniqueId}`);
+            const otpButton = card.querySelector(".generate-otp-btn");
+            const otpPanel = card.querySelector(`#otp-${uniqueId}`);
 
-        otpButton.addEventListener("click", async () => {
-            otpButton.classList.toggle("active");
-            card.classList.toggle("active");
-            otpPanel.classList.toggle("show");
+            otpButton.addEventListener("click", async () => {
+                otpButton.classList.toggle("active");
+                card.classList.toggle("active");
+                otpPanel.classList.toggle("show");
 
+                const normalizedNumber = numberObj.number.replace(/^\+|\s/g, "");
+
+                if (otpPanel.classList.contains("show")) {
+                    // Opened: fetch and start polling
+                    await this.fetchAndDisplayAllOtps(numberObj, uniqueId);
+                    this.startPollingForNumber(numberObj, uniqueId);
+                } else {
+                    // Closed: stop polling
+                    this.stopPollingForNumber(uniqueId);
+                }
+            });
+
+            // Load cached OTPs if available
             const normalizedNumber = numberObj.number.replace(/^\+|\s/g, "");
-
-            if (otpPanel.classList.contains("show")) {
-                // Opened: fetch and start polling
-                await this.fetchAndDisplayAllOtps(numberObj, uniqueId);
-                this.startPollingForNumber(numberObj, uniqueId);
-            } else {
-                // Closed: stop polling
-                this.stopPollingForNumber(uniqueId);
+            if (this.otpCache.has(normalizedNumber)) {
+                const cachedOtps = this.otpCache.get(normalizedNumber);
+                cachedOtps.sort((a, b) => new Date(b.parsedTimestamp) - new Date(a.parsedTimestamp));
+                cachedOtps
+                    .slice(0, KrispCallGenerator.MAX_OTPS_TO_DISPLAY)
+                    .forEach((otp) => {
+                        this.addOtpToNumber(uniqueId, otp);
+                    });
+                this.otpCache.delete(normalizedNumber);
             }
         });
 
-        // Load cached OTPs if available
-        const normalizedNumber = numberObj.number.replace(/^\+|\s/g, "");
-        if (this.otpCache.has(normalizedNumber)) {
-            const cachedOtps = this.otpCache.get(normalizedNumber);
-            cachedOtps.sort((a, b) => new Date(b.parsedTimestamp) - new Date(a.parsedTimestamp));
-            cachedOtps
-                .slice(0, KrispCallGenerator.MAX_OTPS_TO_DISPLAY)
-                .forEach((otp) => {
-                    this.addOtpToNumber(uniqueId, otp);
-                });
-            this.otpCache.delete(normalizedNumber);
-        }
-    });
-
-    this.setupCopyFunctionality(container);
-}
+        this.setupCopyFunctionalities(container);
+    }
 
 
-    setupCopyFunctionality(container) {
+    setupCopyFunctionalities(container) {
         const copyMessage = document.getElementById("copy-message");
 
         container.querySelectorAll(".copy-icon").forEach((icon) => {
@@ -708,7 +712,7 @@ this.allNumbers
     }
 
 
-    
+
     // Fetch and render all OTPs for a number
     async fetchAndDisplayAllOtps(numberObj, uniqueId) {
         const inboxContainer = this.getSafeElement(`#otp-inbox-${uniqueId}`);
@@ -718,7 +722,7 @@ this.allNumbers
         inboxContainer.innerHTML = `<div class="otp-loading">Loading messages...</div>`;
 
         try {
-            const apiUrl = `https://extension-dashboard-backend-latest.onrender.com/inbox/?number=${encodeURIComponent(numberObj.number)}`;
+            const apiUrl = `https://freetoolsapi.krispcall.biz/inbox/?number=${encodeURIComponent(numberObj.number)}`;
             const response = await fetch(apiUrl);
             if (!response.ok) throw new Error(`Server error: ${response.status}`);
 
@@ -742,7 +746,7 @@ this.allNumbers
             const normalizedNumber = numberObj.number.replace(/^[+\s]/g, "");
             this.persistentOtpStorage.set(normalizedNumber, allOtpData.slice(0, KrispCallGenerator.MAX_OTPS_TO_DISPLAY));
 
-            allOtpData.forEach(otp => this.addOtpToNumber(uniqueId, otp));
+            allOtpData.forEach(otp => this.addOtpToNumber(uniqueId, otp, { prepend: false }));
 
         } catch (error) {
             console.error("Error fetching all OTPs:", error);
@@ -755,15 +759,13 @@ this.allNumbers
     startPollingForNumber(numberObj, uniqueId) {
         if (this.pollingIntervals.has(uniqueId)) return;
 
-        console.log(`[Polling] Starting for ${numberObj.number}`);
-
         const intervalId = setInterval(async () => {
             try {
                 const normalizedNumber = numberObj.number.replace(/^[+\s]/g, "");
                 const storedOtps = this.persistentOtpStorage.get(normalizedNumber) || [];
                 const lastTimestamp = storedOtps.length > 0 ? storedOtps[0].parsedTimestamp : new Date(0).toISOString();
 
-                const apiUrl = `https://extension-dashboard-backend-latest.onrender.com/inbox/new/?number=${encodeURIComponent(numberObj.number)}&since=${encodeURIComponent(lastTimestamp)}`;
+                const apiUrl = `https://freetoolsapi.krispcall.biz/inbox/new/?number=${encodeURIComponent(numberObj.number)}&since=${encodeURIComponent(lastTimestamp)}`;
 
                 const res = await fetch(apiUrl);
                 if (res.status === 204 || !res.ok) return;
@@ -801,21 +803,19 @@ this.allNumbers
         if (this.pollingIntervals.has(uniqueId)) {
             clearInterval(this.pollingIntervals.get(uniqueId));
             this.pollingIntervals.delete(uniqueId);
-            console.log(`[Polling] Stopped for number ID: ${uniqueId}`);
         }
     }
 
     // Cleanup all polling intervals
     cleanup() {
-        
+
         this.pollingIntervals.forEach(interval => clearInterval(interval));
         this.pollingIntervals.clear();
-        console.log("Cleaned up all active polling intervals.");
     }
 
     // Add OTP to inbox visually
-    addOtpToNumber(numberId, otp) {
-        const { text, code, parsedTimestamp, fromNumber } = otp;
+    addOtpToNumber(numberId, otp, { prepend = true } = {}) {
+        const { text, code, parsedTimestamp } = otp;
         const otpInbox = this.getSafeElement(`#otp-inbox-${numberId}`);
         if (!otpInbox) return;
 
@@ -834,35 +834,43 @@ this.allNumbers
             if (diff < 5) return "just now";
             if (diff < 60) return `${diff}s ago`;
             const mins = Math.floor(diff / 60);
-            if (mins < 60) return `${mins} min${mins > 1 ? "s" : ""} ago`;
+            if (mins < 60) return `${mins}m ago`;
             const hrs = Math.floor(mins / 60);
-            if (hrs < 24) return `${hrs} hour${hrs > 1 ? "s" : ""} ago`;
-            return past.toLocaleString();
+            if (hrs < 24) return `${hrs}h ago`;
+            return past.toLocaleDateString([], { month: 'short', day: 'numeric' }) + ' · ' +
+                past.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
         };
 
         const otpMessage = document.createElement("div");
         otpMessage.className = "otp-message fade-in";
         otpMessage.setAttribute("data-timestamp", parsedTimestamp);
         otpMessage.innerHTML = `
-            <div class="otp-element">
-                <span class="otp-time" data-timestamp="${parsedTimestamp}">${timeAgo(parsedTimestamp)}</span>
-                <div class="copy-icon otp-copy copy-icon number-copy" data-copy="${code}" title="Copy OTP">
-                    <img src="icons/copy-icon.svg" class="copy-default" />
-                    <img src="icons/hover-icon.svg" class="copy-hover" />
-                    <img src="icons/click-icon.svg" class="copy-done" />
-                    <span class="copy-text"></span>
-                </div>
+        <div class="otp-element">
+            <span class="otp-time" data-timestamp="${parsedTimestamp}">${timeAgo(parsedTimestamp)}</span>
+            <div class="copy-icon otp-copy copy-icon number-copy" data-copy="${code}" title="Copy OTP">
+                <img src="icons/copy-icon.svg" class="copy-default" />
+                <img src="icons/hover-icon.svg" class="copy-hover" />
+                <img src="icons/click-icon.svg" class="copy-done" />
+                <span class="copy-text"></span>
             </div>
-            <div class="otp-text">${text}</div>
-        `;
+        </div>
+        <div class="otp-text">${text}</div>
+    `;
 
-        otpInbox.prepend(otpMessage);
+        if (prepend) {
+            otpInbox.prepend(otpMessage);
+        } else {
+            otpInbox.appendChild(otpMessage);
+        }
+
         while (otpInbox.children.length > KrispCallGenerator.MAX_OTPS_TO_DISPLAY) {
             otpInbox.removeChild(otpInbox.lastChild);
         }
 
         this.setupCopyFunctionality(otpInbox);
     }
+
 
     // Add copy functionality to new elements
     setupCopyFunctionality(container) {
@@ -943,7 +951,6 @@ this.allNumbers
 
             try {
                 const numbers = await this.fetchNumbersFromAPI(country.code, false);
-                console.log("Fetched numbers:", numbers);
 
                 this.allNumbers = this.allNumbers.filter(num => num.type !== "regular");
 
@@ -967,47 +974,47 @@ this.allNumbers
             }
         });
     }
-    
-    
+
+
     copyToClipboard(text, button) {
         navigator.clipboard
-        .writeText(text)
-        .then(() => {
-            const originalText = button.textContent;
-            button.textContent = "Copied!";
-            button.classList.add("copied");
-            setTimeout(() => {
-                button.textContent = originalText;
-                button.classList.remove("copied");
-            }, 2000);
-        })
-        .catch((err) => {
-            console.error("Clipboard error:", err);
-            button.textContent = "Error";
-            setTimeout(() => (button.textContent = "Copy"), 2000);
-        });
+            .writeText(text)
+            .then(() => {
+                const originalText = button.textContent;
+                button.textContent = "Copied!";
+                button.classList.add("copied");
+                setTimeout(() => {
+                    button.textContent = originalText;
+                    button.classList.remove("copied");
+                }, 2000);
+            })
+            .catch((err) => {
+                console.error("Clipboard error:", err);
+                button.textContent = "Error";
+                setTimeout(() => (button.textContent = "Copy"), 2000);
+            });
     }
-    
+
     setLoadingState(isLoading) {
         const button = this.getSafeElement("#generate");
         const buttonText = this.getSafeElement("#generate-text");
-        
+
         if (button) button.disabled = isLoading;
         if (buttonText) buttonText.innerHTML = isLoading
-        ? "Generating Number...</span>"
-        : "Generate Number";
+            ? "Generating Number...</span>"
+            : "Generate Number";
     }
-    
+
     showError(message) {
         console.error("Error:", message);
         this.showCustomAlert(message, "error");
     }
-    
+
     showWarning(message) {
         console.warn("Warning:", message);
         this.showCustomAlert(message, "warning");
     }
-    
+
     showCustomAlert(message, type, duration) {
         const alertBox = document.createElement("div");
         alertBox.className = `custom-alert custom-alert-${type}`;
@@ -1015,31 +1022,31 @@ this.allNumbers
         <span>${message}</span>
         <button class="alert-close-btn">×</button>
         `;
-        
+
         const closeBtn = alertBox.querySelector(".alert-close-btn");
         const closeAlert = () => alertBox.remove();
-        
+
         if (closeBtn) closeBtn.addEventListener("click", closeAlert);
-        
+
         document.body.appendChild(alertBox);
-        
+
         if (typeof duration === "number" && duration >= 1000) {
             const autoClose = setTimeout(() => {
                 closeAlert();
             }, duration);
-            
+
             if (closeBtn) closeBtn.addEventListener("click", () => clearTimeout(autoClose));
         }
     }
-    
+
     getSafeElement(selector) {
         return document.querySelector(selector);
     }
-    
+
     generateId() {
         return Math.random().toString(36).substr(2, 9);
     }
-    
+
     cleanup() {
         this.refreshIntervals.forEach((interval) => clearInterval(interval));
         this.refreshIntervals.clear();
