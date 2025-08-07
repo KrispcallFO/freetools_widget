@@ -92,30 +92,41 @@ export class Repository {
 
 
   static async deleteNumber(number: string): Promise<JSON> {
-    try {
-      const deletedNumber = await this.prisma.countries_Number.deleteMany({
-        where: {
-          number: number,
-        },
-      });
-      if (!deletedNumber) {
-        console.log(`Number ${number} not found`);
-        return JSON.parse(
-          JSON.stringify({ message: `Number ${number} not found` })
-        );
-      }
-      console.log(`Number ${number} deleted successfully`);
-      return JSON.parse(JSON.stringify(deletedNumber));
-    } catch (error) {
-      console.error("Error deleting number:", error);
+  try {
+    // 1. Fetch all numbers from the DB
+    const allNumbers = await this.prisma.countries_Number.findMany();
+
+    // 2. Match sanitized input number against sanitized DB numbers
+    const match = allNumbers.find(entry => {
+      const dbSanitized = entry.number.replace(/[^0-9]/g, "");
+      return dbSanitized === number;
+    });
+
+    if (!match) {
+      console.log(`Number ${number} not found`);
       return JSON.parse(
-        JSON.stringify({
-          error: "Error deleting number",
-          details: error instanceof Error ? error.message : error,
-        })
+        JSON.stringify({ message: `Number ${number} not found` })
       );
     }
+
+    // 3. Delete by ID (safe and direct)
+    const deletedNumber = await this.prisma.countries_Number.delete({
+      where: { id: match.id },
+    });
+
+    console.log(`Number ${number} deleted successfully`);
+    return JSON.parse(JSON.stringify(deletedNumber));
+  } catch (error) {
+    console.error("Error deleting number:", error);
+    return JSON.parse(
+      JSON.stringify({
+        error: "Error deleting number",
+        details: error instanceof Error ? error.message : error,
+      })
+    );
   }
+}
+
 
   static async getAllNumbers(country: string): Promise<string[]> {
     try {

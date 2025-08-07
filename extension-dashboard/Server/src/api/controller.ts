@@ -164,7 +164,10 @@ export class Controller {
     res: Response
   ) => {
     try {
-      const number = req.query.number as string;
+      let number = req.query.number as string;
+      if (number) {
+        number = number.replace(/[^0-9]/g, "");
+      }
       if (!number) {
         res.status(400).json({ error: "Number query parameter is required" });
         return;
@@ -252,7 +255,10 @@ export class Controller {
     res: Response
   ) => {
     try {
-      const phoneNumber = req.query.number as string;
+      let phoneNumber = req.query.number as string;
+      if (phoneNumber) {
+        phoneNumber = phoneNumber.replace(/[^0-9]/g, "");
+      }
       const timestamp = req.query.since as string;
       if (!timestamp) {
         res.status(400).json({ error: "timestamp query parameter is required" });
