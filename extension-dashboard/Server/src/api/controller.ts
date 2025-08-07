@@ -140,7 +140,11 @@ export class Controller {
     res: Response
   ) => {
     try {
-      const number = req.query.number as string;
+      let number = req.query.number as string;
+      if (number) {
+        number = number.replace(/[^0-9]/g, "");
+      }
+
       if (!number) {
         res.status(400).json({ error: "Number query parameter is required" });
         return;
