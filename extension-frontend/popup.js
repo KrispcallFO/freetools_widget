@@ -772,7 +772,7 @@ class KrispCallGenerator {
 
                 const newApiMessages = await res.json();
                 if (!Array.isArray(newApiMessages) || newApiMessages.length === 0) return;
-
+                inboxContainer.innerHTML = '';
                 newApiMessages.sort((a, b) => new Date(b.time_stamp) - new Date(a.time_stamp));
 
                 const updatedStored = [...newApiMessages.map(msg => ({

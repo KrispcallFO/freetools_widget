@@ -461,26 +461,32 @@ public static getPhoneCheckerController: RequestHandler = async (
   public static getTextToSpeechController: RequestHandler = async (
     req: Request, res: Response) => {
     try {
+      const token = req.get('x-install-token');
+      if (!token) {
+        res.status(400).json({ message: 'Missing x-install-token' });
+        return;
+      }
+
       const text = req.query.sentence as string;
       const voice = req.query.voice as string || '';
       if (!text) {
         res.status(400).json({ error: "Text query parameter is required" });
         return;
       }
-      const textToSpeechInfo = await Services.getTextToSpeechInfo(text,voice);
+      const textToSpeechInfo = await Services.getTextToSpeechInfo(token, text, voice);
       if (!textToSpeechInfo) {
         res.status(404).json({ error: `No text to speech information found for text ${text}` });
         return;
       }
       res.setHeader("Content-Type", "audio/mpeg");
-    res.setHeader("Content-Disposition", "inline; filename=voicemail.mp3");
-    res.status(200).send(textToSpeechInfo);
+      res.setHeader("Content-Disposition", "inline; filename=voicemail.mp3");
+      res.status(200).send(textToSpeechInfo);
     } catch (error) {
       console.error("Error in getTextToSpeechController:", error);
       res.status(500).json({ error: "Internal Server Error" });
     }
   }
-
+  
   public static getVoicemailGeneratorController: RequestHandler = async (
     req: Request, res: Response) => {
     try {

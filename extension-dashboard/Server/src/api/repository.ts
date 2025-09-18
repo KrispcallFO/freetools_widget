@@ -1,6 +1,11 @@
 import { PrismaClient } from "@prisma/client";
-
+import crypto from 'crypto';
+import jwt from 'jsonwebtoken';
+import type { ExtensionInstall } from "@prisma/client";
 export class Repository {
+  private static prisma = new PrismaClient();
+  
+  private static INSTALL_SECRET = process.env.EXT_INSTALL_SECRET!;
   static async getAllNumbersFromDatabase(): Promise<{ number: string; id: number; countries: string; country_code: string; }[]> {
     try {
       return await this.prisma.countries_Number.findMany({
@@ -27,8 +32,68 @@ export class Repository {
     }
   }
   
-  private static prisma = new PrismaClient();
 
+  private static signToken(installId: string) {
+    return jwt.sign({ iid: installId }, Repository.INSTALL_SECRET, { algorithm: 'HS256' });
+  }
+  static verifyToken(token: string): { iid: string } {
+    return jwt.verify(token, Repository.INSTALL_SECRET) as any;
+  }
+
+  static async createOrGetToken(params: {
+    installId: string;
+    userEmail?: string | null;
+    profileId?: string | null;
+  }): Promise<{ installToken: string; record: ExtensionInstall }> {
+    const existing = await this.prisma.extensionInstall.findUnique({
+      where: { installId: params.installId },
+    });
+    if (existing) {
+      return { installToken: existing.installToken, record: existing };
+    }
+
+    const token = this.signToken(params.installId);
+    const rec = await this.prisma.extensionInstall.create({
+      data: {
+        installId: params.installId,
+        installToken: token,
+        userEmail: params.userEmail ?? null,
+        profileId: params.profileId ?? null,
+      },
+    });
+    return { installToken: token, record: rec };
+  }
+
+  static async findByToken(installToken: string): Promise<ExtensionInstall | null> {
+    return this.prisma.extensionInstall.findUnique({ where: { installToken } });
+  }
+
+  /** Atomically consume one credit */
+  static async tryConsumeOne(installToken: string): Promise<number | null> {
+    const res = await this.prisma.extensionInstall.updateMany({
+      where: { installToken, quotaRemaining: { gt: 0 } },
+      data: { quotaRemaining: { decrement: 1 } },
+    });
+    if (res.count === 0) return null;
+    const updated = await this.findByToken(installToken);
+    return updated!.quotaRemaining;
+  }
+
+  static async refundOne(installToken: string) {
+    await this.prisma.extensionInstall.update({
+      where: { installToken },
+      data: { quotaRemaining: { increment: 1 } },
+    });
+  }
+
+  // Optional guardrails:
+  static async countRecentRegistrationsByProfile(profileId: string, hours = 24) {
+    const since = new Date(Date.now() - hours * 3600_000);
+    return this.prisma.extensionInstall.count({
+      where: { profileId, createdAt: { gte: since } },
+    });
+  }
+  
   static async addNumber(
     country: string,
     number: string,

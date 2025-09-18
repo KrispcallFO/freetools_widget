@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { Controller } from "../api/controller";
+import { registerInstall } from '../api/extRegisterController';
 import { authorizeRoles, isAuthenticated } from '../middlewares/auth';
 import multer from 'multer';
 const upload = multer({ storage: multer.memoryStorage() }); // or use diskStorage
@@ -40,5 +41,5 @@ router.post("/speech-to-text", upload.single('audio_file'), Controller.getSpeech
 router.get('/text-to-speech/', Controller.getTextToSpeechController);
 router.get('/voicemail-generator', Controller.getVoicemailGeneratorController);
 
-
+router.post('/ext-register/', registerInstall);
 export default router;

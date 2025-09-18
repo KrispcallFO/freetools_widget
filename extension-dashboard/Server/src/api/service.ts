@@ -4,11 +4,12 @@ import type { Response } from 'express';
 import FormData from 'form-data';
 import axios from 'axios';
 import { Readable } from 'stream';
-
+import { QuotaService } from './quotaService';
 
 export class Services {
 
   static apiUrl = process.env.api_url;
+  static quota = new QuotaService();
   static getAllNumbers(): Promise<any[]> {
       try {
         return Repository.getAllNumbersFromDatabase();
@@ -433,9 +434,12 @@ if (model) {
 }
 }
 
-  public static async getTextToSpeechInfo(text: string, language: string): Promise<ArrayBuffer> {
+  public static async getTextToSpeechInfo(installToken: string,text: string, language: string): Promise<ArrayBuffer> {
     try {
       let url = '';
+      if (!installToken) {
+        throw new Error("installToken is required in header");
+      }
       if (!text) {
         throw new Error("Text is required for text to speech conversion");
       }
@@ -452,12 +456,19 @@ if (model) {
       const headers = {
         "api-key": apiKey,
       };
+      const ticket = await this.quota.acquireTicket(installToken);
+      try {
       const response = await fetch(url, { headers: headers });
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+         await ticket.refund(); throw new Error(`HTTP ${response.status}`);;
       }
       const audioBuffer = await response.arrayBuffer();
       return (Buffer.from(audioBuffer));
+    }
+    catch (error) {
+        console.error("Fetch error:", error);
+        throw error;
+      }
     } catch (error) {
       console.error("Error fetching text to speech info:", error);
       throw error;

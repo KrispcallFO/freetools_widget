@@ -55,3 +55,16 @@ model User {
 
     @@map("user") 
 }
+
+
+model ExtensionInstall {
+  id              String   @id @default(cuid())
+  installToken    String   @unique                    // server-signed or random secret
+  installId       String   @unique                    // client-generated UUID (optional but handy)
+  userEmail       String?                             // optional
+  profileId       String?                             // chrome.identity id (optional)
+  quotaRemaining  Int      @default(3)                // 3 per install
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+}
