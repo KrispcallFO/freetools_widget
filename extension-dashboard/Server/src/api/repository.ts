@@ -266,7 +266,6 @@ export class Repository {
           from_number: true,
           time_stamp: true,
         },
-        take: 5,
       });
       if (!details) {
         console.log(`No details found for number ${number}`);
